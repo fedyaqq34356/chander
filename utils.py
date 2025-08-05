@@ -37,7 +37,7 @@ def format_order_message(sell_currency, sell_amount, buy_currency, buy_amount, o
     
     return f"""✅ Подтвердить
 Ваша заявка #{order_id} принята!
-Secret: {secret}
+Secret: `{secret}`
 Продаете: {sell_amount} {sell_currency}
 Покупаете: {buy_amount:.4f} {buy_currency}
 Ордер актуален до {expiry_time}
@@ -49,9 +49,16 @@ def get_new_order_message():
     return """Для создания новой заявки нажмите Совершить обмен
 Нажимая Совершить обмен, Вы подтверждаете что ознакомились с разделом /terms"""
 
-def format_admin_message(username, user_id, sell_currency, sell_amount, buy_currency, buy_amount):
+def format_admin_message(username, user_id, sell_currency, sell_amount, buy_currency, buy_amount, order_id, secret):
     """Форматирует сообщение для админской группы"""
-    return f"""Новая заявка от @{username} (ID: {user_id})
+    expiry_time = get_expiry_time()
+    
+    return f"""Заявка #{order_id}
 
-Продаете: {sell_amount} {sell_currency}
-Покупаете: {buy_amount:.4f} {buy_currency}"""
+Secret: `{secret}`
+Продажа: {sell_amount} {sell_currency}
+Покупка: {buy_amount:.8f} {buy_currency}
+
+Курс актуален до {expiry_time}
+
+Пользователь: @{username} (ID: {user_id})"""
