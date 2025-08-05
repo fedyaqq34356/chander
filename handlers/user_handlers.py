@@ -129,7 +129,7 @@ async def confirm_order(message: Message, state: FSMContext):
         secret
     )
     
-    await message.answer(user_message)
+    await message.answer(user_message, parse_mode="Markdown")
     
     # Отправляем второе сообщение с предложением новой заявки
     new_order_message = get_new_order_message()
@@ -143,11 +143,13 @@ async def confirm_order(message: Message, state: FSMContext):
             data['sell_currency'],
             data['sell_amount'],
             data['buy_currency'],
-            data['buy_amount']
+            data['buy_amount'],
+            order_id,
+            secret
         )
         
         try:
-            await message.bot.send_message(ADMIN_GROUP_ID, admin_message)
+            await message.bot.send_message(ADMIN_GROUP_ID, admin_message, parse_mode="Markdown")
         except Exception as e:
             print(f"Ошибка отправки в админскую группу: {e}")
     
