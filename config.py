@@ -6,10 +6,13 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_GROUP_ID = os.getenv("ADMIN_GROUP_ID")  # ID админской группы
 
+# API ключ для криптовалютных данных
+CRYPTO_API_KEY = "AOW+eS2+9pydgA2vqULxIA==BrNtGI6blyrTpUbE"
+
 # Поддерживаемые криптовалюты
 CURRENCIES = ["BTC", "ETH", "USDT", "SOL", "LTC", "TRX"]
 
-# Курсы обмена (по умолчанию)
+# Курсы обмена (по умолчанию - будут обновляться через API)
 EXCHANGE_RATES = {
     "BTC": 45000.0,
     "ETH": 2500.0,
