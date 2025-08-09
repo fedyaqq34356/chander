@@ -2,6 +2,7 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from utm_manager import utm_manager
 
 from states import ExchangeStates
 from keyboards import (
@@ -22,13 +23,33 @@ from config import CURRENCIES, ADMIN_GROUP_ID
 
 router = Router()
 
+# Заменить обработчик /start на этот:
 @router.message(Command("start"))
-async def start_handler(message: Message):
-    """Обработчик команды /start"""
+async def start_handler(message: Message, state: FSMContext):
+    """Обработчик команды /start с поддержкой UTM"""
+    # Проверяем, есть ли UTM параметр
+    utm_code = None
+    is_demo = False
+    
+    if message.text and len(message.text.split()) > 1:
+        utm_code = message.text.split()[1]
+        utm_type = utm_manager.check_utm_code(utm_code)
+        
+        if utm_type:
+            is_demo = (utm_type == "demo")
+            # Сохраняем информацию о типе ссылки в состоянии пользователя
+            await state.update_data(is_demo=is_demo, utm_code=utm_code)
+    
+    # Формируем приветственное сообщение
     text = """Для создания новой заявки нажмите Совершить обмен
 Нажимая Совершить обмен, Вы подтверждаете что ознакомились с разделом /terms"""
     
+    # Добавляем предупреждение для демо-режима
+    if is_demo:
+        text = "🎭 ДЕМО РЕЖИМ\n" + text + "\n\n⚠️ Это демонстрационная версия!"
+    
     await message.answer(text, reply_markup=get_main_keyboard())
+    
 
 @router.message(Command("terms"))
 async def terms_handler(message: Message):
@@ -83,6 +104,8 @@ async def enter_amount(message: Message, state: FSMContext):
     except ValueError:
         await message.answer("Введите корректное число")
 
+# Только изменённые функции из user_handlers.py
+
 @router.message(ExchangeStates.choosing_buy_currency, F.text.in_(CURRENCIES))
 async def choose_buy_currency(message: Message, state: FSMContext):
     """Выбор валюты для покупки"""
@@ -95,18 +118,25 @@ async def choose_buy_currency(message: Message, state: FSMContext):
         await message.answer("Нельзя обменять валюту саму на себя. Выберите другую валюту.")
         return
     
-    buy_amount = calculate_exchange_amount(sell_currency, buy_currency, sell_amount)
+    # Показываем индикатор загрузки
+    await message.answer("💱 Получение актуальных курсов...")
+    
+    # ИЗМЕНЕНИЕ: теперь используем async функцию
+    buy_amount = await calculate_exchange_amount(sell_currency, buy_currency, sell_amount)
     
     await state.update_data(
         buy_currency=buy_currency,
         buy_amount=buy_amount
     )
     
-    await message.answer("💱")
+    # Показываем курс и скидку для USDT-BTC
+    rate_info = ""
+    if sell_currency == "USDT" and buy_currency == "BTC":
+        rate_info = "\n🎯 Скидка 5% для пары USDT → BTC применена!"
     
     confirmation_text = f"""Подтвердите заявку:
 Продаете: {sell_amount} {sell_currency}
-Покупаете: {buy_amount:.4f} {buy_currency}"""
+Покупаете: {buy_amount:.8f} {buy_currency}{rate_info}"""
     
     await message.answer(confirmation_text, reply_markup=get_confirmation_keyboard())
     await state.set_state(ExchangeStates.confirming_order)
@@ -115,6 +145,7 @@ async def choose_buy_currency(message: Message, state: FSMContext):
 async def confirm_order(message: Message, state: FSMContext):
     """Подтверждение заявки"""
     data = await state.get_data()
+    is_demo = data.get('is_demo', False)
     
     order_id = generate_order_id()
     secret = generate_secret()
@@ -126,13 +157,17 @@ async def confirm_order(message: Message, state: FSMContext):
         data['buy_currency'],
         data['buy_amount'],
         order_id,
-        secret
+        secret,
+        is_demo
     )
     
     await message.answer(user_message, parse_mode="Markdown")
     
     # Отправляем второе сообщение с предложением новой заявки
     new_order_message = get_new_order_message()
+    if is_demo:
+        new_order_message = "🎭 ДЕМО РЕЖИМ\n" + new_order_message
+    
     await message.answer(new_order_message, reply_markup=get_main_keyboard())
     
     # Отправляем в админскую группу
@@ -145,7 +180,8 @@ async def confirm_order(message: Message, state: FSMContext):
             data['buy_currency'],
             data['buy_amount'],
             order_id,
-            secret
+            secret,
+            is_demo
         )
         
         try:
